@@ -1,3 +1,5 @@
+// Register.tsx
+
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Text, TextInput, View } from "react-native";

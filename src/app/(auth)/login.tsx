@@ -1,3 +1,5 @@
+//Login.tsx
+
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
@@ -8,7 +10,7 @@ import { FormField } from "../../components/FormField";
 import { SubmitButton } from "../../components/SubmitButton";
 import { useAuth } from "../../contexts/AuthContexts";
 import type { FieldErrors } from "../../types/auth";
-import { AuthError, DEMO_ACCOUNT } from "../../utils/authService";
+import { AuthError } from "../../utils/authService";
 import {
     hasErrors,
     validateLogin,
@@ -76,11 +78,6 @@ export default function Login() {
     }
   };
 
-  const fillDemo = () => {
-    setValues({ email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password });
-    setErrors({});
-    setFormError(null);
-  };
 
   return (
     <AuthLayout
@@ -161,23 +158,6 @@ export default function Login() {
         >
           Log In
         </SubmitButton>
-
-        <View className="flex-row items-center justify-between gap-3 border-t border-dashed border-line pt-4">
-          <Text className="flex-1 font-display text-xs text-muted">
-            Demo: {DEMO_ACCOUNT.email} · {DEMO_ACCOUNT.password}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            disabled={submitting}
-            onPress={fillDemo}
-            hitSlop={8}
-            className="shrink-0 rounded-[6px] px-2.5 py-1 active:bg-ink/5"
-          >
-            <Text className="font-display text-xs font-medium text-ink">
-              Fill in
-            </Text>
-          </Pressable>
-        </View>
       </View>
     </AuthLayout>
   );

@@ -1,3 +1,5 @@
+// forgot-password.tsx
+
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
@@ -9,39 +11,104 @@ import { useAuth } from "../../contexts/AuthContexts";
 import { AuthError } from "../../utils/authService";
 import { validateEmail } from "../../utils/validation";
 
-// `underline-offset`, `decoration-*`, `hover:` and `focus-visible:` don't exist on native.
 const linkClass = "font-semibold text-ink underline";
 
 export default function ForgotPassword() {
-  const { requestPasswordReset } = useAuth();
+  // We need two new functions from AuthContext: requestPasswordReset and verifyResetOTP
+  const { requestPasswordReset, verifyResetOTP } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | undefined>();
+
+  // Form states
+  const [ctuEmail, setCtuEmail] = useState("");
+  const [gmailEmail, setGmailEmail] = useState("");
+  const [otp, setOtp] = useState("");
+
+  // UI states
+  const [step, setStep] = useState<"request" | "verify">("request");
+  const [error, setError] = useState<{ ctu?: string; gmail?: string; otp?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [sentTo, setSentTo] = useState<string | null>(null);
 
-  // Replaces document.getElementById('forgot-email').focus()
-  const emailRef = useRef<TextInput | null>(null);
+  // Refs for focusing
+  const ctuEmailRef = useRef<TextInput | null>(null);
+  const gmailEmailRef = useRef<TextInput | null>(null);
+  const otpRef = useRef<TextInput | null>(null);
 
-  const handleSubmit = async () => {
-    if (submitting) return; // the keyboard's return key can fire this while loading
-    const found = validateEmail(email);
-    setError(found);
-    if (found) {
-      emailRef.current?.focus();
+  const handleRequestOTP = async () => {
+    if (submitting) return;
+
+    // 1. Validate format
+    let ctuError = validateEmail(ctuEmail);
+    let gmailError = validateEmail(gmailEmail);
+
+    // 2. Enforce the specific domains
+    if (!ctuError && !ctuEmail.trim().toLowerCase().endsWith("@ctu.edu.ph")) {
+      ctuError = "Must be a @ctu.edu.ph email.";
+    }
+    if (!gmailError && !gmailEmail.trim().toLowerCase().endsWith("@gmail.com")) {
+      gmailError = "Must be a @gmail.com email.";
+    }
+
+    setError({ ctu: ctuError, gmail: gmailError });
+
+    if (ctuError) {
+      ctuEmailRef.current?.focus();
       return;
     }
+    if (gmailError) {
+      gmailEmailRef.current?.focus();
+      return;
+    }
+
     setSubmitting(true);
     setFormError(null);
+
     try {
-      await requestPasswordReset(email.trim());
-      setSentTo(email.trim());
+      // Send both emails to the backend
+      await requestPasswordReset(ctuEmail.trim(), gmailEmail.trim());
+      setStep("verify"); // Move to OTP input screen
     } catch (err) {
       setFormError(
         err instanceof AuthError
           ? err.message
-          : "Something went wrong. Please try again.",
+          : "Something went wrong. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (submitting) return;
+
+    // Validate OTP length (assuming 6 digits)
+    if (!otp || otp.length < 6) {
+      setError({ otp: "Please enter the 6-digit code." });
+      otpRef.current?.focus();
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      // Verify OTP and get user data back from the backend
+      const userData = await verifyResetOTP(ctuEmail.trim(), otp.trim());
+      
+      // Navigate to the new reset-password screen with data
+      router.push({
+        pathname: "/(auth)/reset-password",
+        params: { 
+          ctuEmail: ctuEmail.trim(), 
+          fullName: userData.full_name, 
+          username: userData.username 
+        }
+      });
+    } catch (err) {
+      setFormError(
+        err instanceof AuthError
+          ? err.message
+          : "Invalid or expired OTP. Please try again."
       );
     } finally {
       setSubmitting(false);
@@ -50,8 +117,12 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout
-      title="Reset password"
-      subtitle="Enter the email you signed up with and we’ll send you a reset link."
+      title={step === "request" ? "Reset password" : "Enter OTP"}
+      subtitle={
+        step === "request"
+          ? "Enter your CTU email and the Gmail where we'll send the OTP."
+          : `We sent a 6-digit code to ${gmailEmail}. It expires in 5 minutes.`
+      }
       backTo="/(auth)/login"
       footer={
         <>
@@ -66,50 +137,97 @@ export default function ForgotPassword() {
         </>
       }
     >
-      {sentTo ? (
+      {step === "request" ? (
         <View className="gap-4">
-          <FormAlert tone="success">
-            If an account exists for{" "}
-            <Text className="font-semibold">{sentTo}</Text>, a reset link is on
-            its way. Check your inbox and spam folder.
-          </FormAlert>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setSentTo(null)}
-            className="h-12 w-full items-center justify-center rounded-[6px] border border-ink active:bg-ink/5"
+          {formError && <FormAlert tone="error">{formError}</FormAlert>}
+
+          <FormField
+            ref={ctuEmailRef}
+            id="forgot-ctu-email"
+            label="CTU Email"
+            type="email"
+            autoComplete="email"
+            placeholder="name@ctu.edu.ph"
+            value={ctuEmail}
+            onChangeText={(text) => {
+              setCtuEmail(text);
+              setError({ ...error, ctu: undefined });
+            }}
+            error={error.ctu}
+            disabled={submitting}
+            returnKeyType="next"
+            onSubmitEditing={() => gmailEmailRef.current?.focus()}
+          />
+
+          <FormField
+            ref={gmailEmailRef}
+            id="forgot-gmail-email"
+            label="Recovery Gmail"
+            type="email"
+            autoComplete="email"
+            placeholder="name@gmail.com"
+            value={gmailEmail}
+            onChangeText={(text) => {
+              setGmailEmail(text);
+              setError({ ...error, gmail: undefined });
+            }}
+            error={error.gmail}
+            disabled={submitting}
+            returnKeyType="send"
+            onSubmitEditing={handleRequestOTP}
+          />
+
+          <SubmitButton
+            loading={submitting}
+            loadingLabel="Sending OTP…"
+            onPress={handleRequestOTP}
           >
-            <Text className="font-display text-sm font-semibold text-ink">
-              Use a different email
-            </Text>
-          </Pressable>
+            Send OTP
+          </SubmitButton>
         </View>
       ) : (
         <View className="gap-4">
           {formError && <FormAlert tone="error">{formError}</FormAlert>}
+
           <FormField
-            ref={emailRef}
-            id="forgot-email"
-            label="Email address"
-            type="email"
-            autoComplete="email"
-            placeholder="name@ctu.edu.ph"
-            value={email}
+            ref={otpRef}
+            id="forgot-otp"
+            label="6-Digit OTP"
+            type="text"
+            placeholder="000000"
+            value={otp}
             onChangeText={(text) => {
-              setEmail(text);
-              setError(undefined);
+              setOtp(text);
+              setError({ ...error, otp: undefined });
             }}
-            error={error}
+            error={error.otp}
             disabled={submitting}
             returnKeyType="send"
-            onSubmitEditing={handleSubmit}
+            onSubmitEditing={handleVerifyOTP}
+            maxLength={6}
+            keyboardType="number-pad"
           />
+
           <SubmitButton
             loading={submitting}
-            loadingLabel="Sending link…"
-            onPress={handleSubmit}
+            loadingLabel="Verifying…"
+            onPress={handleVerifyOTP}
           >
-            Send reset link
+            Verify Code
           </SubmitButton>
+
+          <Pressable
+            onPress={() => {
+              setStep("request");
+              setOtp("");
+              setError({});
+            }}
+            className="mt-2 items-center"
+          >
+            <Text className="text-sm font-semibold text-ink/60 underline">
+              Didn't get a code? Try again.
+            </Text>
+          </Pressable>
         </View>
       )}
     </AuthLayout>

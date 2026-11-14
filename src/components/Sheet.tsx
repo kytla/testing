@@ -49,6 +49,14 @@ export function Sheet({
     easing: Easing.bezier(0.23, 1, 0.32, 1),
   });
 
+  //ADRIAN - I just added right now
+  useEffect(() => {
+    console.log('Sheet open =', open, 'ref =', !!sheetRef.current);
+    if (open) sheetRef.current?.present();
+    else sheetRef.current?.dismiss();
+  }, [open]);
+
+
   // The `open` prop drives the sheet.
   useEffect(() => {
     if (open) sheetRef.current?.present();
