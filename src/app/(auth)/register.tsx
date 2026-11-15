@@ -21,12 +21,15 @@ import {
 const initialValues: Record<RegisterFields, string> = {
   fullName: "",
   email: "",
+  recoveryEmail: "", // Add this
   password: "",
   confirmPassword: "",
 };
+
 const fieldNames: RegisterFields[] = [
   "fullName",
   "email",
+  "recoveryEmail", // Add this
   "password",
   "confirmPassword",
 ];
@@ -65,6 +68,7 @@ export default function Register() {
       await register({
         fullName: values.fullName.trim(),
         email,
+        recoveryEmail: values.recoveryEmail.trim(), // Add this
         password: values.password,
       });
       toast.success("Account created");
@@ -128,6 +132,10 @@ export default function Register() {
           blurOnSubmit={false}
           onSubmitEditing={() => inputs.current.email?.focus()}
         />
+
+
+
+
         <FormField
           ref={(el) => {
             inputs.current.email = el;
@@ -143,8 +151,33 @@ export default function Register() {
           disabled={submitting}
           returnKeyType="next"
           blurOnSubmit={false}
-          onSubmitEditing={() => inputs.current.password?.focus()}
+          onSubmitEditing={() => inputs.current.recoveryEmail?.focus()} // Updated to focus recoveryEmail
         />
+
+        {/* --- NEW RECOVERY EMAIL FIELD --- */}
+        <FormField
+          ref={(el) => {
+            inputs.current.recoveryEmail = el;
+          }}
+          id="register-recoveryEmail"
+          label="Recovery email"
+          type="email"
+          autoComplete="email"
+          placeholder="backup@example.com"
+          value={values.recoveryEmail}
+          onChangeText={update("recoveryEmail")}
+          error={errors.recoveryEmail}
+          hint="Used to recover your account if you forget your password."
+          disabled={submitting}
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => inputs.current.password?.focus()} // Focus password next
+        />
+        {/* ------------------------------- */}
+
+
+
+
         <FormField
           ref={(el) => {
             inputs.current.password = el;

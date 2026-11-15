@@ -1,3 +1,5 @@
+// tabs/_layout.tsx
+
 import { Redirect } from "expo-router";
 import { AppShell } from "../../components/AppShell";
 import { useAuth } from "../../contexts/AuthContexts";

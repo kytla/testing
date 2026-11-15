@@ -4,7 +4,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 export const PASSWORD_MIN = 8;
 
-export type RegisterFields = 'fullName' | 'email' | 'password' | 'confirmPassword';
+export type RegisterFields = "fullName" | "email" | "recoveryEmail" | "password" | "confirmPassword";
 export type LoginFields = 'email' | 'password';
 export type ProfileFields = 'fullName' | 'email' | 'username';
 
@@ -40,11 +40,31 @@ export function validateRegister(values: Record<RegisterFields, string>): FieldE
   const errors: FieldErrors<RegisterFields> = {
     fullName: validateFullName(values.fullName),
     email: validateEmail(values.email),
+    recoveryEmail: validateEmail(values.recoveryEmail), // Added validation here
     password: validatePassword(values.password)
   };
-  if (!values.confirmPassword) errors.confirmPassword = 'Confirm your password.';else
-  if (values.confirmPassword !== values.password) errors.confirmPassword = 'Passwords don’t match.';
+   if (
+    values.email && 
+    values.recoveryEmail && 
+    values.email.trim().toLowerCase() === values.recoveryEmail.trim().toLowerCase()
+  ) {
+    errors.recoveryEmail = 'Recovery email must be different from your primary email.';
+  }
+
+   if (!values.recoveryEmail.trim()) {
+    errors.recoveryEmail = "Recovery email is required.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.recoveryEmail)) {
+    errors.recoveryEmail = "Please enter a valid email address.";
+  }
+
+  if (!values.confirmPassword) {
+    errors.confirmPassword = 'Confirm your password.';
+  } else if (values.confirmPassword !== values.password) {
+    errors.confirmPassword = 'Passwords don’t match.';
+  }
+
   return clean(errors);
+
 }
 
 export function validateLogin(values: Record<LoginFields, string>): FieldErrors<LoginFields> {

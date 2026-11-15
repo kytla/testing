@@ -13,21 +13,35 @@ const makeToken = (user) =>
 
 router.post("/register", async (req, res) => {
   try {
-    const { full_name, password } = req.body;
+   // 1. Destructure recovery_email
+    const { full_name, password, recovery_email } = req.body;
     const email = (req.body.email ?? "").trim().toLowerCase();
-    if (!full_name || !email || !password || password.length < 8) {
+    
+    // 2. Add validation for the new field
+    if (!full_name || !email || !password || password.length < 8 || !recovery_email) {
       return res
         .status(400)
         .json({ error: "Missing fields, or password shorter than 8." });
     }
+    
+    // 3. Hash password
     const hash = await bcrypt.hash(password, 10);
+    
+    // 4. Update the INSERT query
     const { rows } = await pool.query(
-      `INSERT INTO users (full_name, email, password_hash)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (full_name, email, password_hash, recovery_email)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, full_name, email, role`,
-      [full_name.trim(), email, hash],
+      [full_name.trim(), email, hash, recovery_email.trim().toLowerCase()],
     );
+    
     res.status(201).json({ user: rows[0], token: makeToken(rows[0]) });
+
+
+
+
+
+
   } catch (err) {
     if (err.code === "23505")
       return res

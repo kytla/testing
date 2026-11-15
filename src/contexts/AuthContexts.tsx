@@ -21,11 +21,11 @@ interface AuthContextValue {
   status: AuthStatus;
   user: PrivateProfile | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<PrivateProfile>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (update: ProfileUpdate) => Promise<PrivateProfile>;
-  requestPasswordReset: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string, fullName: string) => Promise<void>;
 }
 
 const TOKEN_KEY = "ctu-confession:session";
@@ -80,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(newToken);
     setUser(profile);
     setStatus("authenticated");
+    return profile; // the login screen uses profile.role to pick where to go
   }, []);
 
   const register = useCallback(
@@ -110,7 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const requestPasswordReset = useCallback(
-    (email: string) => authService.requestPasswordReset(email),
+    (email: string, fullName: string) =>
+      authService.requestPasswordReset(email, fullName),
     [],
   );
 

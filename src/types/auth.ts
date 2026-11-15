@@ -5,14 +5,17 @@ export interface PrivateProfile {
   email: string;
   username: string;
   createdAt: string;
+  recoveryEmail?: string; // Add this (optional for profile display)
 }
 
 export interface RegisterInput {
   fullName: string;
   email: string;
+  recoveryEmail: string; // ADD THIS LINE
   password: string;
 }
 
+// ... rest of the file stays the same
 export interface ProfileUpdate {
   fullName: string;
   email: string;

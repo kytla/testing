@@ -1,3 +1,6 @@
+///app/_layout.tsx
+
+
 import "../global.css"; // your NativeWind CSS import: keep whatever path you already have
 
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";

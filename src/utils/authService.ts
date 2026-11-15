@@ -33,8 +33,10 @@ const toProfile = (u: ServerUser): PrivateProfile => ({
   fullName: u.full_name,
   email: u.email,
   username: u.email.split("@")[0],
+  role: u.role === "admin" ? "admin" : "student",
   createdAt: u.created_at ?? new Date().toISOString(),
 });
+
 
 async function call<T>(path: string, options?: Parameters<typeof api>[1]): Promise<T> {
   try {
@@ -71,10 +73,15 @@ async function currentUserId(token: string): Promise<string> {
 }
 
 export const authService = {
-  async register({ fullName, email, password }: RegisterInput): Promise<void> {
+  async register({ fullName, email, recoveryEmail, password }: RegisterInput): Promise<void> {
     await call("/auth/register", {
       method: "POST",
-      body: { full_name: fullName, email, password },
+      body: { 
+        full_name: fullName, 
+        email, 
+        recovery_email: recoveryEmail, // Map to backend snake_case
+        password 
+      },
     });
   },
 
@@ -130,3 +137,5 @@ export const authService = {
     await writeOwners(owners);
   },
 };
+
+
