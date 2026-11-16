@@ -1,19 +1,17 @@
-// AuthContext.tsx
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 import type {
-    AuthStatus,
-    PrivateProfile,
-    ProfileUpdate,
-    RegisterInput,
+  AuthStatus,
+  PrivateProfile,
+  ProfileUpdate,
+  RegisterInput,
 } from "../types/auth";
 import { AuthError, authService } from "../utils/authService";
 
@@ -21,11 +19,12 @@ interface AuthContextValue {
   status: AuthStatus;
   user: PrivateProfile | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<PrivateProfile>;
+  login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (update: ProfileUpdate) => Promise<PrivateProfile>;
-  requestPasswordReset: (email: string, fullName: string) => Promise<void>;
+  requestPasswordReset: (email: string, gmailEmail: string) => Promise<void>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<void>;
 }
 
 const TOKEN_KEY = "ctu-confession:session";
@@ -34,7 +33,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<PrivateProfile | null>(null);
-  // AsyncStorage is async, so we can't know yet whether a session exists.
   const [status, setStatus] = useState<AuthStatus>("loading");
 
   const clearSession = useCallback(() => {
@@ -44,7 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus("unauthenticated");
   }, []);
 
-  // Restore an existing session on launch.
   useEffect(() => {
     let cancelled = false;
 
@@ -80,7 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(newToken);
     setUser(profile);
     setStatus("authenticated");
-    return profile; // the login screen uses profile.role to pick where to go
   }, []);
 
   const register = useCallback(
@@ -111,8 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const requestPasswordReset = useCallback(
-    (email: string, fullName: string) =>
-      authService.requestPasswordReset(email, fullName),
+    (email: string, gmailEmail: string) => authService.requestPasswordReset(email, gmailEmail),
+    [],
+  );
+
+  const resetPassword = useCallback(
+    (email: string, otp: string, newPassword: string) => authService.resetPassword(email, otp, newPassword),
     [],
   );
 
@@ -126,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       updateProfile,
       requestPasswordReset,
+      resetPassword,
     }),
     [
       status,
@@ -136,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       updateProfile,
       requestPasswordReset,
+      resetPassword,
     ],
   );
 
@@ -160,7 +162,5 @@ async function writeToken(token: string | null): Promise<void> {
   try {
     if (token) await AsyncStorage.setItem(TOKEN_KEY, token);
     else await AsyncStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // storage unavailable
-  }
+  } catch {}
 }

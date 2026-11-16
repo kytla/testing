@@ -14,6 +14,8 @@ import { FullScreenLoader } from "../components/FullScreenLoader";
 import { AuthProvider, useAuth } from "../contexts/AuthContexts";
 import { ConfessionsProvider } from "../contexts/ConfessionContext";
 
+import * as Linking from "expo-linking";
+
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
@@ -52,6 +54,30 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+   const router = useRouter();
+
+  useEffect(() => {
+    const handleDeepLink = (event: { url: string }) => {
+      const { path, queryParams } = Linking.parse(event.url);
+      
+      // Check if the link is for resetting the password
+      if (path === "reset-password" && queryParams?.token) {
+        router.push(`/(auth)/reset-password?token=${queryParams.token}`);
+      }
+    };
+
+    // Listener for when app is already open
+    const subscription = Linking.addEventListener("url", handleDeepLink);
+    
+    // Handle link that opened the app from a closed state
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => subscription.remove();
+  }, [router]);
+  
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>

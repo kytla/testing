@@ -1,8 +1,3 @@
-/**
- * Real auth service: talks to the Express API.
- * The post-ownership helpers still use on-device storage until the confessions
- * endpoints exist (then the database's author_id replaces them).
- */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api, ApiError } from "../lib/api";
 import type { PrivateProfile, ProfileUpdate, RegisterInput } from "../types/auth";
@@ -26,17 +21,13 @@ interface ServerUser {
   created_at?: string;
 }
 
-// The database has no username column. The app's types still expect one,
-// so we show the part of the email before the @.
 const toProfile = (u: ServerUser): PrivateProfile => ({
   id: u.id,
   fullName: u.full_name,
   email: u.email,
   username: u.email.split("@")[0],
-  role: u.role === "admin" ? "admin" : "student",
   createdAt: u.created_at ?? new Date().toISOString(),
 });
-
 
 async function call<T>(path: string, options?: Parameters<typeof api>[1]): Promise<T> {
   try {
@@ -47,7 +38,6 @@ async function call<T>(path: string, options?: Parameters<typeof api>[1]): Promi
   }
 }
 
-// --- Temporary on-device post ownership (replace when confessions go to the API) ---
 const OWNERS_KEY = "ctu-confession:post-owners";
 
 async function readOwners(): Promise<Record<string, string>> {
@@ -62,9 +52,7 @@ async function readOwners(): Promise<Record<string, string>> {
 async function writeOwners(owners: Record<string, string>) {
   try {
     await AsyncStorage.setItem(OWNERS_KEY, JSON.stringify(owners));
-  } catch {
-    // storage unavailable
-  }
+  } catch {}
 }
 
 async function currentUserId(token: string): Promise<string> {
@@ -79,7 +67,7 @@ export const authService = {
       body: { 
         full_name: fullName, 
         email, 
-        recovery_email: recoveryEmail, // Map to backend snake_case
+        recovery_email: recoveryEmail,
         password 
       },
     });
@@ -93,7 +81,6 @@ export const authService = {
     return token;
   },
 
-  // Tokens are stateless, so logging out just means the app forgets it.
   async logout(_token: string): Promise<void> {},
 
   async getMe(token: string): Promise<PrivateProfile> {
@@ -101,7 +88,6 @@ export const authService = {
     return toProfile(user);
   },
 
-  // The username isn't stored anymore, so only name and email are saved.
   async updateMe(token: string, update: ProfileUpdate): Promise<PrivateProfile> {
     const { user } = await call<{ user: ServerUser }>("/auth/me", {
       method: "PATCH",
@@ -111,8 +97,19 @@ export const authService = {
     return toProfile(user);
   },
 
-  // Password reset needs the OTP endpoints. The old fake behavior is kept for now.
-  async requestPasswordReset(_email: string): Promise<void> {},
+  async requestPasswordReset(email: string, recovery_email: string): Promise<void> {
+    await call("/auth/forgot-password", {
+      method: "POST",
+      body: { email, recovery_email },
+    });
+  },
+
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+    await call("/auth/reset-password", {
+      method: "POST",
+      body: { email, otp, newPassword },
+    });
+  },
 
   async listMyPostIds(token: string): Promise<string[]> {
     const userId = await currentUserId(token);
@@ -137,5 +134,3 @@ export const authService = {
     await writeOwners(owners);
   },
 };
-
-

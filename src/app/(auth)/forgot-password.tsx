@@ -1,47 +1,44 @@
-// forgot-password.tsx
-
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { toast } from "sonner-native"; 
 import { AuthLayout } from "../../components/AuthLayout";
 import { FormAlert } from "../../components/FormAlert";
 import { FormField } from "../../components/FormField";
 import { SubmitButton } from "../../components/SubmitButton";
 import { useAuth } from "../../contexts/AuthContexts";
 import { AuthError } from "../../utils/authService";
-import { validateEmail } from "../../utils/validation";
+import { validateEmail, validatePassword } from "../../utils/validation";
 
 const linkClass = "font-semibold text-ink underline";
 
 export default function ForgotPassword() {
-  // We need two new functions from AuthContext: requestPasswordReset and verifyResetOTP
-  const { requestPasswordReset, verifyResetOTP } = useAuth();
+  const { requestPasswordReset, resetPassword } = useAuth();
   const router = useRouter();
 
-  // Form states
   const [ctuEmail, setCtuEmail] = useState("");
   const [gmailEmail, setGmailEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
-  // UI states
   const [step, setStep] = useState<"request" | "verify">("request");
-  const [error, setError] = useState<{ ctu?: string; gmail?: string; otp?: string }>({});
+  const [error, setError] = useState<{ ctu?: string; gmail?: string; otp?: string; password?: string; confirm?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Refs for focusing
   const ctuEmailRef = useRef<TextInput | null>(null);
   const gmailEmailRef = useRef<TextInput | null>(null);
   const otpRef = useRef<TextInput | null>(null);
+  const passwordRef = useRef<TextInput | null>(null);
+  const confirmRef = useRef<TextInput | null>(null);
 
-  const handleRequestOTP = async () => {
+  const handleSendOTP = async () => {
     if (submitting) return;
 
-    // 1. Validate format
     let ctuError = validateEmail(ctuEmail);
     let gmailError = validateEmail(gmailEmail);
 
-    // 2. Enforce the specific domains
     if (!ctuError && !ctuEmail.trim().toLowerCase().endsWith("@ctu.edu.ph")) {
       ctuError = "Must be a @ctu.edu.ph email.";
     }
@@ -51,65 +48,45 @@ export default function ForgotPassword() {
 
     setError({ ctu: ctuError, gmail: gmailError });
 
-    if (ctuError) {
-      ctuEmailRef.current?.focus();
-      return;
-    }
-    if (gmailError) {
-      gmailEmailRef.current?.focus();
-      return;
-    }
+    if (ctuError) return ctuEmailRef.current?.focus();
+    if (gmailError) return gmailEmailRef.current?.focus();
 
     setSubmitting(true);
     setFormError(null);
 
     try {
-      // Send both emails to the backend
-      await requestPasswordReset(ctuEmail.trim(), gmailEmail.trim());
-      setStep("verify"); // Move to OTP input screen
+      await requestPasswordReset(ctuEmail.trim(), gmailEmail.trim()); 
+      toast.success(`OTP sent to ${gmailEmail}!`);
+      setStep("verify"); 
     } catch (err) {
-      setFormError(
-        err instanceof AuthError
-          ? err.message
-          : "Something went wrong. Please try again."
-      );
+      setFormError(err instanceof AuthError ? err.message : "Something went wrong.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleVerifyOTP = async () => {
+  const handleResetPassword = async () => {
     if (submitting) return;
 
-    // Validate OTP length (assuming 6 digits)
-    if (!otp || otp.length < 6) {
-      setError({ otp: "Please enter the 6-digit code." });
-      otpRef.current?.focus();
-      return;
-    }
+    let otpError = !otp || otp.length < 6 ? "Please enter the 6-digit code." : undefined;
+    let passwordError = validatePassword(newPassword);
+    let confirmError = newPassword !== confirmPassword ? "Passwords don’t match." : undefined;
+
+    setError({ otp: otpError, password: passwordError, confirm: confirmError });
+
+    if (otpError) return otpRef.current?.focus();
+    if (passwordError) return passwordRef.current?.focus();
+    if (confirmError) return confirmRef.current?.focus();
 
     setSubmitting(true);
     setFormError(null);
 
     try {
-      // Verify OTP and get user data back from the backend
-      const userData = await verifyResetOTP(ctuEmail.trim(), otp.trim());
-      
-      // Navigate to the new reset-password screen with data
-      router.push({
-        pathname: "/(auth)/reset-password",
-        params: { 
-          ctuEmail: ctuEmail.trim(), 
-          fullName: userData.full_name, 
-          username: userData.username 
-        }
-      });
+      await resetPassword(ctuEmail.trim(), otp.trim(), newPassword);
+      toast.success("Password updated successfully! Please log in.");
+      router.replace("/(auth)/login");
     } catch (err) {
-      setFormError(
-        err instanceof AuthError
-          ? err.message
-          : "Invalid or expired OTP. Please try again."
-      );
+      setFormError(err instanceof AuthError ? err.message : "Invalid or expired OTP.");
     } finally {
       setSubmitting(false);
     }
@@ -174,13 +151,13 @@ export default function ForgotPassword() {
             error={error.gmail}
             disabled={submitting}
             returnKeyType="send"
-            onSubmitEditing={handleRequestOTP}
+            onSubmitEditing={handleSendOTP}
           />
 
           <SubmitButton
             loading={submitting}
-            loadingLabel="Sending OTP…"
-            onPress={handleRequestOTP}
+            loadingLabel="Sending Code…"
+            onPress={handleSendOTP}
           >
             Send OTP
           </SubmitButton>
@@ -202,24 +179,60 @@ export default function ForgotPassword() {
             }}
             error={error.otp}
             disabled={submitting}
-            returnKeyType="send"
-            onSubmitEditing={handleVerifyOTP}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
             maxLength={6}
             keyboardType="number-pad"
           />
 
+          <FormField
+            ref={passwordRef}
+            id="forgot-new-password"
+            label="New Password"
+            type="password"
+            placeholder="Enter new password"
+            value={newPassword}
+            onChangeText={(text) => {
+              setNewPassword(text);
+              setError({ ...error, password: undefined });
+            }}
+            error={error.password}
+            disabled={submitting}
+            returnKeyType="next"
+            onSubmitEditing={() => confirmRef.current?.focus()}
+          />
+
+          <FormField
+            ref={confirmRef}
+            id="forgot-confirm-password"
+            label="Confirm Password"
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              setError({ ...error, confirm: undefined });
+            }}
+            error={error.confirm}
+            disabled={submitting}
+            returnKeyType="send"
+            onSubmitEditing={handleResetPassword}
+          />
+
           <SubmitButton
             loading={submitting}
-            loadingLabel="Verifying…"
-            onPress={handleVerifyOTP}
+            loadingLabel="Resetting…"
+            onPress={handleResetPassword}
           >
-            Verify Code
+            Change Password
           </SubmitButton>
 
           <Pressable
             onPress={() => {
               setStep("request");
               setOtp("");
+              setNewPassword("");
+              setConfirmPassword("");
               setError({});
             }}
             className="mt-2 items-center"
